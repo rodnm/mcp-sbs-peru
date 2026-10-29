@@ -30,7 +30,8 @@ uv tool install git+https://github.com/rodnm/mcp-sbs-peru     # instala el coman
 claude mcp add --scope user sbs -- mcp-sbs-peru               # lo conecta a Claude Code en todos sus proyectos
 ```
 
-Abran `claude` en cualquier carpeta: `/mcp` debe mostrar `sbs` conectado. Los Excel que baja quedan en la caché de su
+Abran `claude` en cualquier carpeta: `/mcp` debe mostrar `sbs` conectado. Si la terminal no encuentra el comando
+`mcp-sbs-peru`, corran una vez `uv tool update-shell` y abran una terminal nueva. Los Excel que baja quedan en la caché de su
 usuario (`%LOCALAPPDATA%\mcp-sbs-peru` en Windows, `~/.cache/mcp-sbs-peru` en Linux y macOS). Pueden cambiar la
 carpeta con la variable `MCP_SBS_DATOS`.
 
