@@ -134,7 +134,9 @@ def _reservar_turno():
             anterior = float(TURNOS.read_text())
         except (OSError, ValueError):
             anterior = 0.0
-        turno = max(time.time(), anterior + PAUSA, _ultimo_pedido + PAUSA)
+        ahora = time.time()
+        limite = ahora + 60 * PAUSA        # más adelante que esto solo pasa si el reloj se atrasó: no se espera
+        turno = max([ahora] + [t + PAUSA for t in (anterior, _ultimo_pedido) if t <= limite])
         with contextlib.suppress(OSError):
             TURNOS.write_text(repr(turno))
         _ultimo_pedido = turno

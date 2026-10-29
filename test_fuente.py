@@ -239,6 +239,16 @@ def test_la_pausa_vale_entre_procesos(tmp_path):
     assert min(b - a for a, b in itertools.pairwise(inicios)) >= 0.28
 
 
+def test_un_turno_en_el_futuro_no_deja_dormido_al_servidor(monkeypatch):
+    # si el reloj se atrasó o el archivo de turnos quedó con una hora futura, no se espera esa hora
+    monkeypatch.setattr(fuente, "PAUSA", 0.3)
+    fuente.TURNOS.write_text(repr(time.time() + 3600))
+    _servidor(monkeypatch, lambda p: httpx.Response(200, content=BIFF))
+    inicio = time.monotonic()
+    fuente.descargar("C-1101", "2026-08")
+    assert time.monotonic() - inicio < 1.0
+
+
 def test_una_redireccion_no_se_sigue(monkeypatch):
     pedidos = _servidor(monkeypatch, lambda p: httpx.Response(302, headers={"Location": "https://www.sbs.gob.pe/x"}))
     with pytest.raises(ToolError, match="302"):
