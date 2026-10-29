@@ -1,0 +1,11 @@
+id,pregunta,verdad,tolerancia,boletin,periodo,celda
+bbva_morosidad_ago26,"¿Cuál fue la morosidad (créditos atrasados según criterio SBS / créditos directos) del BBVA Perú en agosto de 2026, en %?",2.72,0.01,B-2401,2026-08,B14
+bcp_part_creditos_ago26,"¿Qué participación de mercado tenía el Banco de Crédito del Perú (BCP) en los créditos directos de la banca múltiple en agosto de 2026, en %?",34.1781,0.05,B-2332,2026-08,E11
+cmac_arequipa_roe_ago26,"¿Cuál fue el ROE (utilidad neta anualizada sobre patrimonio promedio) de la Caja Municipal de Arequipa en agosto de 2026, en %?",22.1523,0.05,C-1301,2026-08,B29
+integra_comision_set26,"¿Cuál era la comisión anual sobre el saldo administrado de AFP Integra en setiembre de 2026, en %?",0.78,0.005,FP-1232,2026-09,B9
+afp_prima_seguro_set26,"¿Cuál era la prima de seguro previsional que descuentan las AFP del Perú en setiembre de 2026, en % de la remuneración?",1.37,0.005,FP-1232,2026-09,C9
+habitat_vc_fondo2_30set26,"¿Cuál fue el valor cuota del fondo 2 de AFP Habitat el 30 de setiembre de 2026, en soles?",29.1985,0.001,FP-1359,2026-09,VC-Diario-Fondo2!B28
+prima_rent_fondo2_1a_set26,"¿Cuál fue la rentabilidad nominal acumulada a un año (de setiembre de 2025 a setiembre de 2026) del fondo 2 de AFP Prima, en %?",19.2122,0.01,FP-1360,2026-09,Rent-Fondo2!B10
+rimac_part_primas_set26,"¿Qué participación tenía Rímac Seguros en el total de primas de seguros netas del Perú, acumulado a setiembre de 2026, en %?",27.0761,0.05,S-342,2026-09,E10
+rimac_roe_set26,"¿Cuál fue el ROE de Rímac Seguros a setiembre de 2026 según la SBS, en %?",13.0273,0.05,S-302,2026-09,S32
+positiva_part_soat_set26,"¿Qué participación de mercado tenía La Positiva en las primas netas de SOAT, acumulado a setiembre de 2026, en %?",54.0335,0.05,S-343,2026-09,E106
