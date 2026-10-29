@@ -354,5 +354,10 @@ def comparar_afp(fondo: str = "2") -> str:
             "boletín, el periodo y la URL de cada cifra, y aclara que es información, no asesoría financiera.")
 
 
-if __name__ == "__main__":
+def main():
+    """El comando mcp-sbs-peru que crea `uv tool install`: el servidor por stdio, igual que `uv run server.py`."""
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()

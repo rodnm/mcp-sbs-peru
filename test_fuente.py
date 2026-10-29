@@ -51,6 +51,17 @@ def _servidor(monkeypatch, responder):
     return pedidos
 
 
+def test_la_cache_vive_en_el_repo_o_en_la_carpeta_del_usuario(monkeypatch, tmp_path):
+    monkeypatch.delenv("MCP_SBS_DATOS", raising=False)
+    (tmp_path / "repo").mkdir()
+    (tmp_path / "repo" / "pyproject.toml").write_text("")
+    assert fuente.carpeta_datos(tmp_path / "repo") == tmp_path / "repo" / "datos"          # corriendo desde el clon
+    instalado = fuente.carpeta_datos(tmp_path / "site-packages")                              # instalado con uv tool
+    assert instalado.name == "mcp-sbs-peru" and "site-packages" not in str(instalado)
+    monkeypatch.setenv("MCP_SBS_DATOS", str(tmp_path / "mia"))
+    assert fuente.carpeta_datos(tmp_path / "repo") == tmp_path / "mia"                       # la variable manda
+
+
 def test_url_usa_setiembre_y_el_codigo_de_mes():
     assert fuente.url("B-2201", "2026-09") == \
         "https://intranet2.sbs.gob.pe/estadistica/financiera/2026/Setiembre/B-2201-se2026.XLS"
