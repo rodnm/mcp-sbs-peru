@@ -236,7 +236,8 @@ def test_la_pausa_vale_entre_procesos(tmp_path):
                                   f"2026-0{i + 4}"], stdout=subprocess.PIPE, text=True) for i in range(3)]
     inicios = sorted(float(t) for p in procesos for t in p.communicate(timeout=120)[0].split())
     assert len(inicios) == 6
-    assert min(b - a for a, b in itertools.pairwise(inicios)) >= 0.28
+    # cada hijo anota la hora después de despertar: un hijo atrasado acorta el hueco siguiente, por eso el margen
+    assert min(b - a for a, b in itertools.pairwise(inicios)) >= 0.2
 
 
 def test_un_turno_en_el_futuro_no_deja_dormido_al_servidor(monkeypatch):

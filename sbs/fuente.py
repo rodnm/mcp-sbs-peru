@@ -100,8 +100,9 @@ def leer_libro(contenido):
 def _candado(espera_maxima=5.0):
     """Exclusión entre procesos con un archivo creado en modo exclusivo (solo biblioteca estándar, Windows y Unix).
 
-    Se tiene unos milisegundos. Si quedó de un proceso que murió, se rompe a los `espera_maxima` segundos; si el
-    disco no deja crearlo, se sigue sin él (el lock de hilos sigue valiendo dentro del proceso).
+    Se tiene unos milisegundos. Si quedó de un proceso que murió, se rompe a los `espera_maxima` segundos. Si no se
+    puede tomar en ese tiempo (PermissionError también se reintenta: Windows lo da mientras otro proceso lo borra) o
+    el disco no deja crearlo, se sigue sin él; el lock de hilos sigue valiendo dentro del proceso.
     """
     ruta = TURNOS.with_name(TURNOS.name + ".lock")
     tomado, limite = False, time.time() + espera_maxima
