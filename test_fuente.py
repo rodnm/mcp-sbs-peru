@@ -172,6 +172,38 @@ def test_una_descarga_sin_fecha_borra_la_fecha_vieja(monkeypatch, tmp_path):
     assert (tmp_path / "C-1101-ag2026.XLS").read_bytes() == BIFF + b"v2"
 
 
+def test_si_la_cache_no_se_puede_guardar_igual_responde_y_no_deja_temporales(monkeypatch, tmp_path):
+    _servidor(monkeypatch, lambda p: httpx.Response(200, content=BIFF))
+
+    def disco_ocupado(*args):
+        raise PermissionError("archivo abierto por otro proceso")
+
+    monkeypatch.setattr(fuente.os, "replace", disco_ocupado)
+    assert fuente.descargar("C-1101", "2026-08").contenido == BIFF
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_en_paralelo_los_pedidos_empiezan_separados_pero_no_se_esperan(monkeypatch):
+    import threading
+    monkeypatch.setattr(fuente, "PAUSA", 0.2)
+    inicios = []
+
+    def lento(pedido):
+        inicios.append(time.monotonic())
+        time.sleep(0.5)
+        return httpx.Response(200, content=BIFF)
+
+    _servidor(monkeypatch, lento)
+    hilos = [threading.Thread(target=fuente.descargar, args=("C-1101", p)) for p in ("2026-07", "2026-08")]
+    inicio = time.monotonic()
+    for h in hilos:
+        h.start()
+    for h in hilos:
+        h.join()
+    assert abs(inicios[1] - inicios[0]) >= 0.18          # nunca dos pedidos a la vez sin pausa
+    assert time.monotonic() - inicio < 1.0               # pero el segundo no espera a que termine el primero
+
+
 def test_entre_pedidos_hay_una_pausa(monkeypatch):
     monkeypatch.setattr(fuente, "PAUSA", 0.3)
     _servidor(monkeypatch, lambda p: httpx.Response(200, content=BIFF))
