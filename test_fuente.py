@@ -52,14 +52,30 @@ def _servidor(monkeypatch, responder):
 
 
 def test_la_cache_vive_en_el_repo_o_en_la_carpeta_del_usuario(monkeypatch, tmp_path):
-    monkeypatch.delenv("MCP_SBS_DATOS", raising=False)
+    for variable in ("MCP_SBS_DATOS", "LOCALAPPDATA", "XDG_CACHE_HOME"):
+        monkeypatch.delenv(variable, raising=False)
+    for variable in ("HOME", "USERPROFILE"):                                    # Path.home() y expanduser() las leen
+        monkeypatch.setenv(variable, str(tmp_path / "casa"))
     (tmp_path / "repo").mkdir()
     (tmp_path / "repo" / "pyproject.toml").write_text("")
-    assert fuente.carpeta_datos(tmp_path / "repo") == tmp_path / "repo" / "datos"          # corriendo desde el clon
-    instalado = fuente.carpeta_datos(tmp_path / "site-packages")                              # instalado con uv tool
-    assert instalado.name == "mcp-sbs-peru" and "site-packages" not in str(instalado)
-    monkeypatch.setenv("MCP_SBS_DATOS", str(tmp_path / "mia"))
-    assert fuente.carpeta_datos(tmp_path / "repo") == tmp_path / "mia"                       # la variable manda
+    instalado = tmp_path / "site-packages"
+    assert fuente.carpeta_datos(tmp_path / "repo") == tmp_path / "repo" / "datos"           # corriendo desde el clon
+    assert fuente.carpeta_datos(instalado) == tmp_path / "casa" / ".cache" / "mcp-sbs-peru"   # instalado, sin variables
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
+    assert fuente.carpeta_datos(instalado) == tmp_path / "xdg" / "mcp-sbs-peru"
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))                                 # Windows primero
+    assert fuente.carpeta_datos(instalado) == tmp_path / "local" / "mcp-sbs-peru"
+    monkeypatch.setenv("MCP_SBS_DATOS", str(tmp_path / "mia"))                                  # la variable manda
+    assert fuente.carpeta_datos(tmp_path / "repo") == tmp_path / "mia"
+
+
+def test_mcp_sbs_datos_acepta_tilde_y_rutas_relativas(monkeypatch, tmp_path):
+    for variable in ("HOME", "USERPROFILE"):
+        monkeypatch.setenv(variable, str(tmp_path))
+    monkeypatch.setenv("MCP_SBS_DATOS", "~/cache-sbs")
+    assert fuente.carpeta_datos() == tmp_path / "cache-sbs"           # sin carpeta literal "~"
+    monkeypatch.setenv("MCP_SBS_DATOS", "relativa")
+    assert fuente.carpeta_datos().is_absolute()                       # fija al arrancar, no según cada consulta
 
 
 def test_url_usa_setiembre_y_el_codigo_de_mes():

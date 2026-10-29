@@ -46,7 +46,14 @@ def test_el_comando_instalado_arranca_el_servidor():
     import server
     proyecto = tomllib.loads((Path(__file__).parent / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     scripts = proyecto["scripts"]
-    assert scripts == {"mcp-sbs-peru": "server:main"} and callable(server.main)
+    assert scripts == {"mcp-sbs-peru": "server:main"}
+    llamadas = []
+    original, server.mcp.run = server.mcp.run, lambda *a, **k: llamadas.append((a, k))
+    try:
+        server.main()
+    finally:
+        server.mcp.run = original
+    assert llamadas == [((), {})]                    # main() arranca el servidor por stdio, sin argumentos
 
 
 def test_listar_reportes_por_sector():

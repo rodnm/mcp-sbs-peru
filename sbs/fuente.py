@@ -32,8 +32,8 @@ FIRMA_ZIP = b"PK\x03\x04"                           # .xlsx o .zip
 def carpeta_datos(raiz=Path(__file__).parent.parent):
     """Dónde va la caché de Excel: MCP_SBS_DATOS si está definida; datos/ del repositorio si se corre desde un clon
     (git la ignora); y si está instalado con `uv tool install`, la carpeta de caché del usuario, no el paquete."""
-    if os.environ.get("MCP_SBS_DATOS"):
-        return Path(os.environ["MCP_SBS_DATOS"])
+    if os.environ.get("MCP_SBS_DATOS"):                # "~/..." y rutas relativas quedan fijas al arrancar
+        return Path(os.environ["MCP_SBS_DATOS"]).expanduser().resolve()
     if (raiz / "pyproject.toml").exists():
         return raiz / "datos"
     base = os.environ.get("LOCALAPPDATA") or os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache"
