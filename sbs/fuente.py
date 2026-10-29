@@ -5,6 +5,7 @@ Las carpetas no se pueden listar (responden 403): las URLs se arman y el último
 retrocediendo mes a mes. www.sbs.gob.pe les pide un desafío de JavaScript a los programas; este módulo no lo usa
 ni intenta pasarlo: si la SBS responde una página web en vez de un archivo, se detiene y lo dice.
 """
+import contextlib
 import io
 import os
 import re
@@ -111,11 +112,22 @@ def _pedir(metodo, direccion, **kwargs):
 
 
 def _escribir(ruta, datos):
-    """Escritura atómica: si el proceso se corta a la mitad, queda el archivo anterior o ninguno, nunca uno roto."""
-    descriptor, temporal = tempfile.mkstemp(dir=ruta.parent, prefix=ruta.name, suffix=".tmp")
-    with os.fdopen(descriptor, "wb") as f:
-        f.write(datos)
-    os.replace(temporal, ruta)
+    """Escritura atómica: si el proceso se corta a la mitad, queda el archivo anterior o ninguno, nunca uno roto.
+
+    Devuelve False si no se pudo (disco lleno, archivo abierto en Windows): la caché ayuda, pero no es requisito.
+    """
+    try:
+        descriptor, temporal = tempfile.mkstemp(dir=ruta.parent, prefix=ruta.name, suffix=".tmp")
+    except OSError:
+        return False
+    try:
+        with os.fdopen(descriptor, "wb") as f:
+            f.write(datos)
+        os.replace(temporal, ruta)
+        return True
+    except OSError:
+        Path(temporal).unlink(missing_ok=True)
+        return False
 
 
 def descargar(codigo, periodo, extension="XLS"):
@@ -145,11 +157,11 @@ def descargar(codigo, periodo, extension="XLS"):
         raise ToolError(f"La SBS respondió {r.status_code} al pedir {direccion}.")
     else:
         formato(r.content, direccion)      # una página de bloqueo se rechaza antes de guardar nada
-        DATOS.mkdir(parents=True, exist_ok=True)
-        marca.unlink(missing_ok=True)          # sin fecha, la próxima vez se baja completo: nunca una fecha vieja
-        _escribir(archivo, r.content)
+        with contextlib.suppress(OSError):
+            DATOS.mkdir(parents=True, exist_ok=True)
+            marca.unlink(missing_ok=True)      # sin fecha, la próxima vez se baja completo: nunca una fecha vieja
         actualizado = r.headers.get("Last-Modified")
-        if actualizado:
+        if _escribir(archivo, r.content) and actualizado:
             _escribir(marca, actualizado.encode("ascii"))
         resultado = Archivo(r.content, direccion, actualizado)
     _validados[direccion] = resultado
@@ -173,7 +185,8 @@ def ultimo_periodo(codigo, extension="XLS", hoy=None, meses=6):
             _ultimos[clave] = {"codigo": codigo, "periodo": periodo,
                                "actualizado": r.headers.get("Last-Modified"), "url": direccion}
             return _ultimos[clave]
-        if r.status_code != 404:               # solo 404 significa "no publicado"; lo demás no se adivina
+        if r.status_code != 404:               # intranet2 responde 404 a los meses sin publicar (visto el
+            # 2026-10-28 con B-, C-, S- y FP-); cualquier otro estado es un problema que no se adivina
             raise ToolError(f"La SBS respondió {r.status_code} al buscar el último mes de {codigo} ({direccion}). "
                             "Prueben en unos minutos o pidan un periodo explícito.")
         anio, mes = (anio, mes - 1) if mes > 1 else (anio - 1, 12)
