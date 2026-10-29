@@ -20,9 +20,28 @@ Le hicimos a Claude (modelo Haiku) 10 preguntas con respuesta oficial conocida, 
 
 El detalle de cada pregunta y por qué falló cada modo está en [`informe.md`](informe.md).
 
-## Uso rápido
+## Instalar
 
-Necesitan [uv](https://docs.astral.sh/uv/) y [Claude Code](https://claude.com/claude-code).
+Necesitan [uv](https://docs.astral.sh/uv/) y [Claude Code](https://claude.com/claude-code). Dos comandos, sin clonar
+nada:
+
+```bash
+uv tool install git+https://github.com/rodnm/mcp-sbs-peru     # instala el comando mcp-sbs-peru
+claude mcp add --scope user sbs -- mcp-sbs-peru               # lo conecta a Claude Code en todos sus proyectos
+```
+
+Abran `claude` en cualquier carpeta: `/mcp` debe mostrar `sbs` conectado. Si la terminal no encuentra el comando
+`mcp-sbs-peru`, corran una vez `uv tool update-shell` y abran una terminal nueva. Los Excel que baja quedan en la caché de su
+usuario (`%LOCALAPPDATA%\mcp-sbs-peru` en Windows, `~/.cache/mcp-sbs-peru` en Linux y macOS). Pueden cambiar la
+carpeta con la variable `MCP_SBS_DATOS`.
+
+| Para | Comando |
+|---|---|
+| Actualizar a lo último | `uv tool upgrade mcp-sbs-peru` y reiniciar Claude Code (los MCP arrancan con la sesión) |
+| Fijar una versión | `uv tool install git+https://github.com/rodnm/mcp-sbs-peru@v0.1.0` (cambien el número para pasar a otra). Con una versión fijada, `upgrade` no la mueve: para volver a lo último, repitan el `uv tool install` sin `@...` |
+| Desinstalar | `claude mcp remove --scope user sbs` y `uv tool uninstall mcp-sbs-peru` |
+
+## Desde el código (para el curso o para colaborar)
 
 ```bash
 git clone https://github.com/rodnm/mcp-sbs-peru
@@ -31,11 +50,8 @@ uv run pytest -q -m "not live"     # pruebas sin internet: deben pasar todas
 claude                             # acepten los servidores de .mcp.json (sbs y fetch)
 ```
 
-Dentro de Claude Code, `/mcp` debe mostrar `sbs` conectado. Para usarlo desde otro proyecto:
-
-```bash
-claude mcp add sbs -- uv run --directory /ruta/a/mcp-sbs-peru server.py
-```
+Dentro del repositorio, `.mcp.json` ya conecta `sbs` (corriendo `uv run server.py`) y `fetch`. Para actualizar esta
+copia: `git pull`.
 
 ## Qué trae
 

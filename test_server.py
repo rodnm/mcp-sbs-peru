@@ -38,6 +38,24 @@ def test_diez_herramientas_un_recurso_y_dos_prompts():
     assert plantillas >= 1 and prompts >= 2
 
 
+def test_el_comando_instalado_arranca_el_servidor():
+    # [project.scripts] mcp-sbs-peru = "server:main": la función existe y es la que corre mcp
+    import tomllib
+    from pathlib import Path
+
+    import server
+    proyecto = tomllib.loads((Path(__file__).parent / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    scripts = proyecto["scripts"]
+    assert scripts == {"mcp-sbs-peru": "server:main"}
+    llamadas = []
+    original, server.mcp.run = server.mcp.run, lambda *a, **k: llamadas.append((a, k))
+    try:
+        server.main()
+    finally:
+        server.mcp.run = original
+    assert llamadas == [((), {})]                    # main() arranca el servidor por stdio, sin argumentos
+
+
 def test_listar_reportes_por_sector():
     codigos = [r["codigo"] for r in llamar("listar_reportes", sector="afp")]
     assert "FP-1232" in codigos and all(c.startswith("FP-") for c in codigos)

@@ -28,7 +28,19 @@ CODIGOS_MES = ["en", "fe", "ma", "ab", "my", "jn", "jl", "ag", "se", "oc", "no",
 FIRMA_BIFF = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"   # Excel 97-2003 (.xls de verdad)
 FIRMA_ZIP = b"PK\x03\x04"                           # .xlsx o .zip
 
-DATOS = Path(__file__).parent.parent / "datos"      # caché en disco; git la ignora
+
+def carpeta_datos(raiz=Path(__file__).parent.parent):
+    """Dónde va la caché de Excel: MCP_SBS_DATOS si está definida; datos/ del repositorio si se corre desde un clon
+    (git la ignora); y si está instalado con `uv tool install`, la carpeta de caché del usuario, no el paquete."""
+    if os.environ.get("MCP_SBS_DATOS"):                # "~/..." y rutas relativas quedan fijas al arrancar
+        return Path(os.environ["MCP_SBS_DATOS"]).expanduser().resolve()
+    if (raiz / "pyproject.toml").exists():
+        return raiz / "datos"
+    base = os.environ.get("LOCALAPPDATA") or os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache"
+    return Path(base) / "mcp-sbs-peru"
+
+
+DATOS = carpeta_datos()
 PAUSA = 1.0                                         # segundos mínimos entre dos pedidos a la SBS
 TURNOS = Path(tempfile.gettempdir()) / "mcp-sbs-peru.turno"   # compartido por todos los procesos de la máquina
 CLIENTE = httpx.Client(headers={"User-Agent": "mcp-sbs-peru/0.1 (servidor MCP educativo, datos publicos)"},  # ASCII
