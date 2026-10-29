@@ -38,7 +38,7 @@ carpeta con la variable `MCP_SBS_DATOS`.
 | Para | Comando |
 |---|---|
 | Actualizar a lo último | `uv tool upgrade mcp-sbs-peru` y reiniciar Claude Code (los MCP arrancan con la sesión) |
-| Fijar una versión | `uv tool install git+https://github.com/rodnm/mcp-sbs-peru@v0.1.0` (cambien el número para pasar a otra) |
+| Fijar una versión | `uv tool install git+https://github.com/rodnm/mcp-sbs-peru@v0.1.0` (cambien el número para pasar a otra). Con una versión fijada, `upgrade` no la mueve: para volver a lo último, repitan el `uv tool install` sin `@...` |
 | Desinstalar | `claude mcp remove --scope user sbs` y `uv tool uninstall mcp-sbs-peru` |
 
 ## Desde el código (para el curso o para colaborar)
