@@ -8,12 +8,24 @@ cualquiera puede comprobarla.
 > Ejemplos: «¿Qué banco tiene la menor morosidad?», «¿Qué AFP cobra menos comisión?», «¿Quién vende más SOAT?»,
 > «ROE de las cajas municipales en agosto de 2026».
 
+## ¿Sirve? El resultado en un gráfico
+
+![Aciertos de Claude Haiku en 10 preguntas sobre cifras oficiales de la SBS: solo memoria 0 de 10, búsqueda web 2 de 10, MCP de la SBS 10 de 10](grafico.png)
+
+Le hicimos a Claude (modelo Haiku) 10 preguntas con respuesta oficial conocida, sacada de los Excel de la SBS:
+
+- **Sin herramientas**, solo con lo que aprendió al entrenarse, acertó **0 de 10**. Las 10 veces dijo que no sabía.
+- **Buscando en internet** acertó **2 de 10**: las dos cifras de AFP que repiten las noticias.
+- **Con este MCP** acertó **10 de 10**, y cada respuesta trae el link del Excel de la SBS de donde salió.
+
+El detalle de cada pregunta y por qué falló cada modo está en [`informe.md`](informe.md).
+
 ## Uso rápido
 
 Necesitan [uv](https://docs.astral.sh/uv/) y [Claude Code](https://claude.com/claude-code).
 
 ```bash
-git clone <url-de-este-repositorio> mcp-sbs-peru
+git clone https://github.com/rodnm/mcp-sbs-peru
 cd mcp-sbs-peru
 uv run pytest -q -m "not live"     # pruebas sin internet: deben pasar todas
 claude                             # acepten los servidores de .mcp.json (sbs y fetch)
