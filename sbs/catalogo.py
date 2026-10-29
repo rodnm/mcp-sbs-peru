@@ -56,7 +56,7 @@ _ALIAS_TIPO = {"banca": "bancos", "banco": "bancos", "cmac": "cajas municipales"
                "edpymes": "empresas de creditos", "financiera": "financieras"}
 RENTABILIDAD = {0: "FP-1219-0", 1: "FP-1220-1", 2: "FP-1360", 3: "FP-1220-2"}
 
-_CODIGO = re.compile(r"[A-Z]{1,3}-\d{3,6}(-\d)?")
+_CODIGO = re.compile(r"[A-Z]{1,3}-[0-9]{3,6}(-[0-9])?")   # [0-9]: \d acepta dígitos de otros alfabetos
 
 
 def sin_tildes(s):
