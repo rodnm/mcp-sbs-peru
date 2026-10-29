@@ -5,6 +5,7 @@
 Un servidor falso (httpx.MockTransport) hace de intranet2, así que corren igual sin internet.
 """
 import io
+import itertools
 import time
 import zipfile
 from datetime import date
@@ -31,8 +32,9 @@ def _xlsx(filas):
 
 
 @pytest.fixture(autouse=True)
-def aislado(monkeypatch, tmp_path):
+def aislado(monkeypatch, tmp_path, tmp_path_factory):
     monkeypatch.setattr(fuente, "DATOS", tmp_path)
+    monkeypatch.setattr(fuente, "TURNOS", tmp_path_factory.mktemp("turnos") / "turno")
     monkeypatch.setattr(fuente, "PAUSA", 0)
     fuente.olvidar()
 
@@ -202,6 +204,57 @@ def test_en_paralelo_los_pedidos_empiezan_separados_pero_no_se_esperan(monkeypat
         h.join()
     assert abs(inicios[1] - inicios[0]) >= 0.18          # nunca dos pedidos a la vez sin pausa
     assert time.monotonic() - inicio < 1.0               # pero el segundo no espera a que termine el primero
+
+
+HIJO = '''
+import sys, time
+from pathlib import Path
+import httpx
+sys.path.insert(0, sys.argv[1])
+from sbs import fuente
+fuente.TURNOS, fuente.DATOS, fuente.PAUSA = Path(sys.argv[2]), Path(sys.argv[3]), 0.3
+inicios = []
+def responder(pedido):
+    inicios.append(time.time())
+    return httpx.Response(200, content=b"\\xd0\\xcf\\x11\\xe0\\xa1\\xb1\\x1a\\xe1" + b"\\0" * 504)
+fuente.CLIENTE = httpx.Client(transport=httpx.MockTransport(responder))
+for periodo in sys.argv[4:]:
+    fuente.descargar("C-1101", periodo)
+print(" ".join(map(repr, inicios)))
+'''
+
+
+def test_la_pausa_vale_entre_procesos(tmp_path):
+    # Claude Code y evaluar.py levantan un servidor por sesión: la pausa tiene que valer para todos juntos
+    import subprocess
+    import sys
+    from pathlib import Path
+    hijo = tmp_path / "hijo.py"
+    hijo.write_text(HIJO, encoding="utf-8")
+    raiz, turno = str(Path(__file__).parent), str(tmp_path / "turno")
+    procesos = [subprocess.Popen([sys.executable, str(hijo), raiz, turno, str(tmp_path / f"datos{i}"), f"2026-0{i + 1}",
+                                  f"2026-0{i + 4}"], stdout=subprocess.PIPE, text=True) for i in range(3)]
+    inicios = sorted(float(t) for p in procesos for t in p.communicate(timeout=120)[0].split())
+    assert len(inicios) == 6
+    # cada hijo anota la hora después de despertar: un hijo atrasado acorta el hueco siguiente, por eso el margen
+    assert min(b - a for a, b in itertools.pairwise(inicios)) >= 0.2
+
+
+def test_un_turno_en_el_futuro_no_deja_dormido_al_servidor(monkeypatch):
+    # si el reloj se atrasó o el archivo de turnos quedó con una hora futura, no se espera esa hora
+    monkeypatch.setattr(fuente, "PAUSA", 0.3)
+    fuente.TURNOS.write_text(repr(time.time() + 3600))
+    _servidor(monkeypatch, lambda p: httpx.Response(200, content=BIFF))
+    inicio = time.monotonic()
+    fuente.descargar("C-1101", "2026-08")
+    assert time.monotonic() - inicio < 1.0
+
+
+def test_una_redireccion_no_se_sigue(monkeypatch):
+    pedidos = _servidor(monkeypatch, lambda p: httpx.Response(302, headers={"Location": "https://www.sbs.gob.pe/x"}))
+    with pytest.raises(ToolError, match="302"):
+        fuente.descargar("B-2201", "2026-09")
+    assert len(pedidos) == 1
 
 
 def test_entre_pedidos_hay_una_pausa(monkeypatch):

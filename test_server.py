@@ -48,9 +48,10 @@ def test_un_tipo_de_entidad_desconocido_dice_cuales_hay():
         llamar("indicadores", tipo_entidad="cooperativas", indicador="morosidad")
 
 
-def test_un_codigo_raro_no_llega_a_la_url():
+@pytest.mark.parametrize("codigo", ["../B-2201", "B-２４０１"])   # el segundo usa dígitos de ancho completo
+def test_un_codigo_raro_no_llega_a_la_url(codigo):
     with pytest.raises(ToolError, match="código"):
-        llamar("reporte", codigo="../B-2201", periodo="2026-08")
+        llamar("reporte", codigo=codigo, periodo="2026-08")
 
 
 @pytest.mark.live

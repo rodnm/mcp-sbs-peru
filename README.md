@@ -60,7 +60,8 @@ claude mcp add sbs -- uv run --directory /ruta/a/mcp-sbs-peru server.py
   SBS por entidad es el indicador «Ingresos financieros anualizados / activo productivo promedio»
   (`indicadores` con `indicador="rendimiento"`). Si necesitan Retasas, lo correcto es pedirle a la SBS un acceso
   abierto.
-- **Uso respetuoso.** Un pedido por segundo como máximo y caché en `datos/`. Si la SBS responde una página web en vez
+- **Uso respetuoso.** Un pedido por segundo como máximo, sumando todos los servidores que corran en la máquina (cada
+  sesión de Claude Code levanta uno), y caché en `datos/`. Si la SBS responde una página web en vez
   de un Excel, el servidor se detiene y lo dice.
 - **Información, no asesoría.** Las cifras son las publicadas por la SBS. Elegir AFP, banco o seguro es una decisión
   de cada uno.
@@ -81,4 +82,5 @@ Proyecto de la sesión 04, «MCP: Claude conectado a tus datos», del curso *Dat
 ([d2cml-ai/Data-Science-Python](https://github.com/d2cml-ai/Data-Science-Python)). El curso proponía un MCP del
 BCRP; este repositorio lo lleva a la SBS. `evaluar.py` y el estilo de las pruebas vienen del proyecto del curso.
 
-Autoría: Rodrigo Norabuena, en coautoría con Claude (Anthropic).
+Autoría: Rodrigo Norabuena, en coautoría con Claude (Anthropic). El código se publica con licencia
+[MIT](LICENSE). Los datos son de la SBS: cítenla como fuente.
