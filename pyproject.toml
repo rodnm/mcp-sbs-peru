@@ -12,7 +12,10 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest"]
+dev = [
+    "matplotlib>=3.11.2",
+    "pytest",
+]
 
 [tool.pytest.ini_options]
 markers = ["live: descarga archivos reales de la SBS (necesita internet)"]

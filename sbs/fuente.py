@@ -30,11 +30,12 @@ FIRMA_ZIP = b"PK\x03\x04"                           # .xlsx o .zip
 
 DATOS = Path(__file__).parent.parent / "datos"      # caché en disco; git la ignora
 PAUSA = 1.0                                         # segundos mínimos entre dos pedidos a la SBS
+TURNOS = Path(tempfile.gettempdir()) / "mcp-sbs-peru.turno"   # compartido por todos los procesos de la máquina
 CLIENTE = httpx.Client(headers={"User-Agent": "mcp-sbs-peru/0.1 (servidor MCP educativo, datos publicos)"},  # ASCII
-                       timeout=60, follow_redirects=True)
+                       timeout=60, follow_redirects=False)   # una redirección (a www, por ejemplo) no se sigue
 
-_turno = threading.Lock()          # un pedido a la vez, con PAUSA entre ellos, aunque Claude llame en paralelo
-_ultimo_pedido = 0.0
+_turno = threading.Lock()          # reparte turnos entre los hilos de este proceso; TURNOS, entre procesos
+_ultimo_pedido = 0.0               # en segundos de reloj (time.time), comparables entre procesos
 _validados = {}                    # url -> Archivo ya revisado en esta sesión
 _ultimos = {}                      # (codigo, extension) -> último periodo encontrado en esta sesión
 
@@ -95,14 +96,58 @@ def leer_libro(contenido):
     return pd.read_excel(io.BytesIO(contenido), sheet_name=None, header=None, engine="calamine")  # .xls y .xlsx
 
 
-def _pedir(metodo, direccion, **kwargs):
-    """Un pedido a la SBS. El lock solo reparte turnos separados por PAUSA; la espera y el pedido van fuera de él,
-    para que una respuesta lenta no deje colgadas las demás herramientas."""
+@contextlib.contextmanager
+def _candado(espera_maxima=5.0):
+    """Exclusión entre procesos con un archivo creado en modo exclusivo (solo biblioteca estándar, Windows y Unix).
+
+    Se tiene unos milisegundos. Si quedó de un proceso que murió, se rompe a los `espera_maxima` segundos. Si no se
+    puede tomar en ese tiempo (PermissionError también se reintenta: Windows lo da mientras otro proceso lo borra) o
+    el disco no deja crearlo, se sigue sin él; el lock de hilos sigue valiendo dentro del proceso.
+    """
+    ruta = TURNOS.with_name(TURNOS.name + ".lock")
+    tomado, limite = False, time.time() + espera_maxima
+    while not tomado and time.time() < limite:
+        try:
+            os.close(os.open(ruta, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            tomado = True
+        except (FileExistsError, PermissionError):
+            with contextlib.suppress(OSError):
+                if time.time() - ruta.stat().st_mtime > espera_maxima:
+                    ruta.unlink()
+                    continue
+            time.sleep(0.005)
+        except OSError:
+            break
+    try:
+        yield
+    finally:
+        if tomado:
+            with contextlib.suppress(OSError):
+                ruta.unlink()
+
+
+def _reservar_turno():
+    """El próximo momento libre para pedirle algo a la SBS, a PAUSA del anterior de cualquier proceso de la máquina:
+    Claude Code y evaluar.py levantan un servidor por sesión, y la pausa tiene que valer para todos juntos."""
     global _ultimo_pedido
-    with _turno:
-        turno = max(time.monotonic(), _ultimo_pedido + PAUSA)
+    with _turno, _candado():
+        try:
+            anterior = float(TURNOS.read_text())
+        except (OSError, ValueError):
+            anterior = 0.0
+        ahora = time.time()
+        limite = ahora + 60 * PAUSA        # más adelante que esto solo pasa si el reloj se atrasó: no se espera
+        turno = max([ahora] + [t + PAUSA for t in (anterior, _ultimo_pedido) if t <= limite])
+        with contextlib.suppress(OSError):
+            TURNOS.write_text(repr(turno))
         _ultimo_pedido = turno
-    espera = turno - time.monotonic()
+    return turno
+
+
+def _pedir(metodo, direccion, **kwargs):
+    """Un pedido a la SBS. Los locks solo reparten turnos separados por PAUSA; la espera y el pedido van fuera de
+    ellos, para que una respuesta lenta no deje colgadas las demás herramientas."""
+    espera = _reservar_turno() - time.time()
     if espera > 0:
         time.sleep(espera)
     try:
@@ -140,11 +185,12 @@ def descargar(codigo, periodo, extension="XLS"):
     marca = archivo.with_name(archivo.name + ".fecha")
     cabeceras, guardado = {}, None
     if archivo.exists() and marca.exists():
-        guardado = archivo.read_bytes()
-        try:
+        try:                                   # la fecha antes que el archivo: si otro proceso los reescribe en el
+            fecha = marca.read_text()          # medio, a lo sumo se pide de nuevo; nunca bytes viejos con fecha nueva
+            guardado = archivo.read_bytes()
             formato(guardado)                  # una caché dañada no se revalida: se vuelve a bajar completa
-            cabeceras["If-Modified-Since"] = marca.read_text()
-        except ToolError:
+            cabeceras["If-Modified-Since"] = fecha
+        except (OSError, ToolError):
             guardado = None
 
     r = _pedir("GET", direccion, headers=cabeceras)
