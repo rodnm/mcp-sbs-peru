@@ -137,6 +137,41 @@ def test_ultimo_periodo_se_rinde_con_un_error_claro(monkeypatch):
         fuente.ultimo_periodo("B-9999", hoy=date(2026, 10, 28))
 
 
+def test_ultimo_periodo_no_confunde_un_error_con_un_mes_sin_publicar(monkeypatch):
+    estado = {"codigo": 503}
+    _servidor(monkeypatch, lambda p: httpx.Response(estado["codigo"]) if "/Octubre/" in str(p.url)
+              else httpx.Response(200, headers={"Content-Type": "application/vnd.ms-excel"}))
+    with pytest.raises(ToolError, match="503"):
+        fuente.ultimo_periodo("B-2201", hoy=date(2026, 10, 28))
+    estado["codigo"] = 200                                # el error no quedó guardado como respuesta
+    assert fuente.ultimo_periodo("B-2201", hoy=date(2026, 10, 28))["periodo"] == "2026-10"
+
+
+def test_un_zip_roto_da_un_error_claro():
+    with pytest.raises(ToolError, match="dañado"):
+        fuente.formato(b"PK\x03\x04 cortado a la mitad")
+
+
+def test_una_cache_danada_se_vuelve_a_bajar_completa(monkeypatch, tmp_path):
+    (tmp_path / "B-2201-se2026.XLS").write_bytes(b"PK\x03\x04 cortado")
+    (tmp_path / "B-2201-se2026.XLS.fecha").write_text("Wed, 28 Oct 2026 10:00:00 GMT")
+    bueno = _xlsx([["ok"]])
+    pedidos = _servidor(monkeypatch, lambda p: httpx.Response(200, content=bueno))
+    assert fuente.descargar("B-2201", "2026-09").contenido == bueno
+    assert "If-Modified-Since" not in pedidos[0].headers
+
+
+def test_una_descarga_sin_fecha_borra_la_fecha_vieja(monkeypatch, tmp_path):
+    respuestas = [httpx.Response(200, content=BIFF, headers={"Last-Modified": "Wed, 28 Oct 2026 10:00:00 GMT"}),
+                  httpx.Response(200, content=BIFF + b"v2")]
+    _servidor(monkeypatch, lambda p: respuestas.pop(0))
+    fuente.descargar("C-1101", "2026-08")
+    fuente.olvidar()
+    fuente.descargar("C-1101", "2026-08")
+    assert not (tmp_path / "C-1101-ag2026.XLS.fecha").exists()
+    assert (tmp_path / "C-1101-ag2026.XLS").read_bytes() == BIFF + b"v2"
+
+
 def test_entre_pedidos_hay_una_pausa(monkeypatch):
     monkeypatch.setattr(fuente, "PAUSA", 0.3)
     _servidor(monkeypatch, lambda p: httpx.Response(200, content=BIFF))

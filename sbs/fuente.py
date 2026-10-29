@@ -6,7 +6,9 @@ retrocediendo mes a mes. www.sbs.gob.pe les pide un desafío de JavaScript a los
 ni intenta pasarlo: si la SBS responde una página web en vez de un archivo, se detiene y lo dice.
 """
 import io
+import os
 import re
+import tempfile
 import threading
 import time
 import zipfile
@@ -72,8 +74,11 @@ def formato(contenido, direccion="el archivo"):
     if contenido.startswith(FIRMA_BIFF):
         return "xls"
     if contenido.startswith(FIRMA_ZIP):
-        with zipfile.ZipFile(io.BytesIO(contenido)) as z:
-            return "xlsx" if "[Content_Types].xml" in z.namelist() else "zip"
+        try:
+            with zipfile.ZipFile(io.BytesIO(contenido)) as z:
+                return "xlsx" if "[Content_Types].xml" in z.namelist() else "zip"
+        except zipfile.BadZipFile:
+            raise ToolError(f"El archivo {direccion} llegó dañado (ZIP incompleto); vuelvan a intentarlo.") from None
     raise _bloqueo(direccion)
 
 
@@ -90,17 +95,27 @@ def leer_libro(contenido):
 
 
 def _pedir(metodo, direccion, **kwargs):
+    """Un pedido a la SBS. El lock solo reparte turnos separados por PAUSA; la espera y el pedido van fuera de él,
+    para que una respuesta lenta no deje colgadas las demás herramientas."""
     global _ultimo_pedido
     with _turno:
-        espera = _ultimo_pedido + PAUSA - time.monotonic()
-        if espera > 0:
-            time.sleep(espera)
-        try:
-            return CLIENTE.request(metodo, direccion, **kwargs)
-        except httpx.HTTPError as e:
-            raise ToolError(f"No se pudo conectar con la SBS ({direccion}): {e}") from e
-        finally:
-            _ultimo_pedido = time.monotonic()
+        turno = max(time.monotonic(), _ultimo_pedido + PAUSA)
+        _ultimo_pedido = turno
+    espera = turno - time.monotonic()
+    if espera > 0:
+        time.sleep(espera)
+    try:
+        return CLIENTE.request(metodo, direccion, **kwargs)
+    except httpx.HTTPError as e:
+        raise ToolError(f"No se pudo conectar con la SBS ({direccion}): {e}") from e
+
+
+def _escribir(ruta, datos):
+    """Escritura atómica: si el proceso se corta a la mitad, queda el archivo anterior o ninguno, nunca uno roto."""
+    descriptor, temporal = tempfile.mkstemp(dir=ruta.parent, prefix=ruta.name, suffix=".tmp")
+    with os.fdopen(descriptor, "wb") as f:
+        f.write(datos)
+    os.replace(temporal, ruta)
 
 
 def descargar(codigo, periodo, extension="XLS"):
@@ -111,11 +126,18 @@ def descargar(codigo, periodo, extension="XLS"):
         return _validados[direccion]
     archivo = DATOS / direccion.rsplit("/", 1)[1]
     marca = archivo.with_name(archivo.name + ".fecha")
-    cabeceras = {"If-Modified-Since": marca.read_text()} if archivo.exists() and marca.exists() else {}
+    cabeceras, guardado = {}, None
+    if archivo.exists() and marca.exists():
+        guardado = archivo.read_bytes()
+        try:
+            formato(guardado)                  # una caché dañada no se revalida: se vuelve a bajar completa
+            cabeceras["If-Modified-Since"] = marca.read_text()
+        except ToolError:
+            guardado = None
 
     r = _pedir("GET", direccion, headers=cabeceras)
-    if r.status_code == 304:
-        resultado = Archivo(archivo.read_bytes(), direccion, marca.read_text())
+    if r.status_code == 304 and cabeceras:
+        resultado = Archivo(guardado, direccion, cabeceras["If-Modified-Since"])
     elif r.status_code == 404:
         raise ToolError(f"La SBS aún no publica {codigo} de {periodo} ({direccion}). "
                         "Prueben un mes anterior o pregunten con ultimo_periodo.")
@@ -124,10 +146,11 @@ def descargar(codigo, periodo, extension="XLS"):
     else:
         formato(r.content, direccion)      # una página de bloqueo se rechaza antes de guardar nada
         DATOS.mkdir(parents=True, exist_ok=True)
-        archivo.write_bytes(r.content)
+        marca.unlink(missing_ok=True)          # sin fecha, la próxima vez se baja completo: nunca una fecha vieja
+        _escribir(archivo, r.content)
         actualizado = r.headers.get("Last-Modified")
         if actualizado:
-            marca.write_text(actualizado)
+            _escribir(marca, actualizado.encode("ascii"))
         resultado = Archivo(r.content, direccion, actualizado)
     _validados[direccion] = resultado
     return resultado
@@ -150,6 +173,9 @@ def ultimo_periodo(codigo, extension="XLS", hoy=None, meses=6):
             _ultimos[clave] = {"codigo": codigo, "periodo": periodo,
                                "actualizado": r.headers.get("Last-Modified"), "url": direccion}
             return _ultimos[clave]
+        if r.status_code != 404:               # solo 404 significa "no publicado"; lo demás no se adivina
+            raise ToolError(f"La SBS respondió {r.status_code} al buscar el último mes de {codigo} ({direccion}). "
+                            "Prueben en unos minutos o pidan un periodo explícito.")
         anio, mes = (anio, mes - 1) if mes > 1 else (anio - 1, 12)
     raise ToolError(f"No encontré {codigo} publicado en los últimos {meses} meses. "
                     "Revisen el código con listar_reportes.")
